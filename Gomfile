@@ -1,0 +1,3 @@
+gom "github.com/stretchr/testify"
+gom "launchpad.net/goyaml"
+
