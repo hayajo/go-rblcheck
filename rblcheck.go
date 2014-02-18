@@ -10,8 +10,8 @@ import (
 )
 
 import(
-	rblnet "./lib/net"
-	"./lib/rbl"
+	rblnet "github.com/hayajo/go-rblcheck/lib/net"
+	"github.com/hayajo/go-rblcheck/lib/rbl"
 )
 
 var rbls = []string{
