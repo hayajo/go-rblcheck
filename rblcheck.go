@@ -61,7 +61,7 @@ func main() {
 
 	ips := make([]net.IP, 0, len(flag.Args()))
 	for _, v := range flag.Args() {
-		verbose.Printf("lookup ip %v", v)
+		verbose.Printf("lookup ip %v\n", v)
 		addrs, err := rblnet.LookupIP(v)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid address %s\n", v)
@@ -69,7 +69,7 @@ func main() {
 		}
 		ips = append(ips, addrs...)
 	}
-	verbose.Printf("check %d addresses", len(ips))
+	verbose.Printf("check %d addresses\n", len(ips))
 
 	exit := 0
 
