@@ -69,9 +69,8 @@ func main() {
 		}
 		ips = append(ips, addrs...)
 	}
-	verbose.Printf("check %d addresses\n", len(ips))
 
-	exit := 0
+	verbose.Printf("check %d addresses\n", len(ips))
 
 	stdout := make(chan string)
 	stderr := make(chan string)
@@ -79,27 +78,11 @@ func main() {
 
 	for _, v := range rbls {
 		rbl := rbl.NewRBL(v)
-		go func() {
-			defer func(){ done<- true }()
-			for _, ip := range ips {
-				if verbose {
-					stdout<- fmt.Sprintf("checking %s in %s\n", ip, rbl.Zone)
-				}
-				res, _ := rbl.LookupRBL(ip)
-				if res.Listed == true {
-					str := fmt.Sprintf("%s listed in %s", res.Ip, res.Zone)
-					if t := res.Text; t != "" {
-						t = strings.Replace(t, "\n", " ", -1)
-						str += fmt.Sprintf(": %s", t)
-					}
-					stderr<- fmt.Sprintln(str)
-					exit = 1
-				}
-			}
-		}()
+		check(rbl, ips, (chan<- string)(stdout), (chan<- string)(stderr), (chan<- bool)(done))
 	}
 
 	remain := len(rbls)
+	exit := 0
 
 	loop:
 	for {
@@ -108,7 +91,8 @@ func main() {
 			fmt.Fprint(os.Stdout, str)
 		case str := <-stderr:
 			fmt.Fprint(os.Stderr, str)
-		case <-done:
+		case ret := <-done:
+			if !ret { exit = 1 }
 			remain--
 			if remain == 0 {
 				break loop
@@ -117,4 +101,26 @@ func main() {
 	}
 
 	os.Exit(exit)
+}
+
+func check(rbl *rbl.RBL, ips []net.IP, stdout chan<- string, stderr chan<- string, done chan<- bool) {
+	go func() {
+		listed := false
+		defer func(){ done<- !listed }()
+		for _, ip := range ips {
+			if verbose {
+				stdout<- fmt.Sprintf("checking %s in %s\n", ip, rbl.Zone)
+			}
+			res, _ := rbl.LookupRBL(ip)
+			if res.Listed == true {
+				str := fmt.Sprintf("%s listed in %s", res.Ip, res.Zone)
+				if t := res.Text; t != "" {
+					t = strings.Replace(t, "\n", " ", -1)
+					str += fmt.Sprintf(": %s", t)
+				}
+				stderr<- fmt.Sprintln(str)
+				listed = true
+			}
+		}
+	}()
 }
