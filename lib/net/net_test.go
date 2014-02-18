@@ -1,4 +1,4 @@
-package util
+package net
 
 import(
 	"github.com/stretchr/testify/assert"
