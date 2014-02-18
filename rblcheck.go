@@ -41,7 +41,7 @@ func (v verboseT) Printf(format string, args ...interface{}) {
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s addr...\n", path.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "Usage: %s addr...\n\n", path.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
 	usage := "verbose"
