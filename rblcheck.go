@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 )
 
 import(
@@ -72,16 +73,7 @@ func main() {
 
 	verbose.Printf("check %d addresses\n", len(ips))
 
-	stdout := make(chan string)
-	stderr := make(chan string)
-	done := make(chan bool)
-
-	for _, v := range rbls {
-		rbl := rbl.NewRBL(v)
-		check(rbl, ips, (chan<- string)(stdout), (chan<- string)(stderr), (chan<- bool)(done))
-	}
-
-	remain := len(rbls)
+	stdout, stderr, fin := worker(rbls, ips)
 	exit := 0
 
 	loop:
@@ -91,36 +83,60 @@ func main() {
 			fmt.Fprint(os.Stdout, str)
 		case str := <-stderr:
 			fmt.Fprint(os.Stderr, str)
-		case ret := <-done:
+		case ret := <-fin:
 			if !ret { exit = 1 }
-			remain--
-			if remain == 0 {
-				break loop
-			}
+			break loop
 		}
 	}
 
 	os.Exit(exit)
 }
 
-func check(rbl *rbl.RBL, ips []net.IP, stdout chan<- string, stderr chan<- string, done chan<- bool) {
+func worker(rbls []string, ips []net.IP) (<-chan string, <-chan string, <-chan bool) {
+	stdout := make(chan string)
+	stderr := make(chan string)
+	fin := make(chan bool)
+
+	var wg sync.WaitGroup
+
 	go func() {
 		listed := false
-		defer func(){ done<- !listed }()
-		for _, ip := range ips {
-			if verbose {
-				stdout<- fmt.Sprintf("checking %s in %s\n", ip, rbl.Zone)
-			}
-			res, _ := rbl.LookupRBL(ip)
-			if res.Listed == true {
-				str := fmt.Sprintf("%s listed in %s", res.Ip, res.Zone)
-				if t := res.Text; t != "" {
-					t = strings.Replace(t, "\n", " ", -1)
-					str += fmt.Sprintf(": %s", t)
-				}
-				stderr<- fmt.Sprintln(str)
-				listed = true
-			}
+
+		for _, v := range rbls {
+			wg.Add(1)
+
+			r := rbl.NewRBL(v)
+			go func(r *rbl.RBL) {
+				listed = check(r, ips, (chan<- string)(stdout), (chan<- string)(stderr))
+				wg.Done()
+			}(r)
 		}
+		wg.Wait()
+
+		fin<- listed
 	}()
+
+	return (<-chan string)(stdout), (<-chan string)(stderr), (<-chan bool)(fin)
+}
+
+func check(r *rbl.RBL, ips []net.IP, stdout chan<- string, stderr chan<- string) bool {
+	listed := false
+
+	for _, ip := range ips {
+		if verbose {
+			stdout<- fmt.Sprintf("checking %s in %s\n", ip, r.Zone)
+		}
+		res, _ := r.LookupRBL(ip)
+		if res.Listed == true {
+			str := fmt.Sprintf("%s listed in %s", res.Ip, res.Zone)
+			if t := res.Text; t != "" {
+				t = strings.Replace(t, "\n", " ", -1)
+				str += fmt.Sprintf(": %s", t)
+			}
+			stderr<- fmt.Sprintln(str)
+			listed = true
+		}
+	}
+
+	return listed
 }
