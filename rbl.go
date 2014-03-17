@@ -1,4 +1,4 @@
-package rbl
+package main
 
 import(
 	"strconv"

@@ -10,11 +10,6 @@ import (
 	"sync"
 )
 
-import(
-	rblnet "github.com/hayajo/go-rblcheck/lib/net"
-	"github.com/hayajo/go-rblcheck/lib/rbl"
-)
-
 var rbls = []string{
 	"zen.spamhaus.org.",
 	"bl.spamcop.net.",
@@ -63,7 +58,7 @@ func main() {
 	ips := make([]net.IP, 0, len(flag.Args()))
 	for _, v := range flag.Args() {
 		verbose.Printf("lookup ip %v\n", v)
-		addrs, err := rblnet.LookupIP(v)
+		addrs, err := LookupIP(v)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid address %s\n", v)
 			os.Exit(1)
@@ -105,21 +100,21 @@ func worker(rbls []string, ips []net.IP) (<-chan string, <-chan string, <-chan b
 		for _, v := range rbls {
 			wg.Add(1)
 
-			r := rbl.NewRBL(v)
-			go func(r *rbl.RBL) {
+			r := NewRBL(v)
+			go func(r *RBL) {
 				listed = check(r, ips, (chan<- string)(stdout), (chan<- string)(stderr))
 				wg.Done()
 			}(r)
 		}
 		wg.Wait()
 
-		fin<- listed
+		fin<- !listed
 	}()
 
 	return (<-chan string)(stdout), (<-chan string)(stderr), (<-chan bool)(fin)
 }
 
-func check(r *rbl.RBL, ips []net.IP, stdout chan<- string, stderr chan<- string) bool {
+func check(r *RBL, ips []net.IP, stdout chan<- string, stderr chan<- string) bool {
 	listed := false
 
 	for _, ip := range ips {
